@@ -12,6 +12,8 @@ import (
 	"appengine"
 	"appengine/urlfetch"
 
+	"code.google.com/p/goauth2/oauth"
+	value "gist.github.com/2dff7bd89dcacd3e70b9.git"
 	"github.com/ImJasonH/csvstruct"
 )
 
@@ -19,23 +21,26 @@ func init() {
 	http.HandleFunc("/upload", uploadHandler)
 }
 
-const apiKey = "AIzaSyAyhQ8SoM1psusUXChfqle92RWYasvmEEc"
-
 var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
 // RoundTripper that adds a token before making the request.
 type tokenRT struct{ c appengine.Context }
 
 func (t tokenRT) RoundTrip(r *http.Request) (*http.Response, error) {
-	tok, _, err := appengine.AccessToken(t.c, "https://www.googleapis.com/auth/drive.file")
-	if err != nil {
-		return nil, err
+	clientID := value.Get(t.c, "client_id")
+	secret := value.Get(t.c, "client_secret")
+	refresh := value.Get(t.c, "refresh_token")
+
+	trans := oauth.Transport{
+		Config: &oauth.Config{
+			ClientId:     clientID,
+			ClientSecret: secret,
+			TokenURL:     "https://accounts.google.com/o/oauth2/token",
+		},
+		Token:     &oauth.Token{RefreshToken: refresh},
+		Transport: &urlfetch.Transport{Context: t.c},
 	}
-	u := r.URL.Query()
-	u.Set("key", apiKey)
-	r.URL.RawQuery = u.Encode()
-	r.Header.Set("Authorization", "Bearer "+tok)
-	return urlfetch.Client(t.c).Do(r)
+	return trans.RoundTrip(r)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
