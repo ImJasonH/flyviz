@@ -1,0 +1,11 @@
+<html><body>
+<form action="/upload" method="post" id="form">
+  <label for="file">Upload your flywheel_stats.xls</label><br />
+  <input type="file" name="file" id="file" width="100%" height="100%"></input>
+  <script type="text/javascript">
+  document.getElementById('file').onchange = function() {
+    document.getElementById('form').submit();
+  };
+  </script>
+</form>
+</body></html>
