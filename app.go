@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"strings"
@@ -19,6 +20,8 @@ func init() {
 }
 
 const apiKey = "AIzaSyAyhQ8SoM1psusUXChfqle92RWYasvmEEc"
+
+var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
 // RoundTripper that adds a token before making the request.
 type tokenRT struct{ c appengine.Context }

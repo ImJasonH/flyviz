@@ -1,0 +1,44 @@
+<html><body>
+<table>
+<thead>
+<tr>
+  <td>Date</td>
+  <td>Time</td>
+  <td>Classroom</td>
+  <td>Instructor</td>
+  <td>Avg RPM</td>
+  <td>Max RPM</td>
+  <td>Avg Torq</td>
+  <td>Max Torq</td>
+  <td>Avg Speed</td>
+  <td>Class Time</td>
+  <td>Total Power</td>
+  <td>Total Distance</td>
+  <td>Estimated Calories</td>
+</tr>
+</thead>
+<tbody>
+{{range .Classes}}
+<tr>
+  <td>{{.Date}}</td>
+Time
+  <td>{{.Classroom}}</td>
+  <td>{{.Instructor}}</td>
+  <td>{{.AvgRPM}}</td>
+  <td>{{.MaxRPM}}</td>
+  <td>{{.AvgTorq}}</td>
+  <td>{{.MaxTorq}}</td>
+  <td>{{.AvgSpeed}}</td>
+  <td>{{.ClassTime}}</td>
+  <td>{{.TotalPower}}</td>
+  <td>{{.TotalDistance}}</td>
+  <td>{{.EstimatedCaloriesLow}} - {{.EstimatedCaloriesHigh}}
+</tr>
+{{else}}
+<tr>
+  <td colspan="13">No data</td>
+<tr>
+{{end}}
+</tbody>
+</table>
+</body></html>
