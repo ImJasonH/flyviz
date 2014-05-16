@@ -3,12 +3,15 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"appengine"
 	"appengine/urlfetch"
+
+	"github.com/ImJasonH/csvstruct"
 )
 
 func init() {
@@ -96,10 +99,36 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, buf.String(), http.StatusInternalServerError)
 		return
 	}
-	io.Copy(w, eresp.Body) // TODO: Moar better.
 
 	// Trash temporary file uploaded for conversion
 	if _, err := client.Post("https://www.googleapis.com/drive/v2/files/"+insertResp.ID+"/trash", "application/json", nil); err != nil {
 		c.Infof("failed to trash: %v", err)
 	}
+
+	// Decode CSV and print
+	type class struct {
+		Date                  int64
+		Time                  string
+		Classroom             string
+		Instructor            string
+		AvgRPM                int     `csv:"Avg RPM"`
+		MaxRPM                int     `csv:"Max RPM"`
+		AvgTorq               int     `csv:"Avg Torq"`
+		MaxTorq               int     `csv:"Max Torq"`
+		AvgSpeed              int     `csv:"Avg Speed"`
+		ClassTime             float64 `csv:"Class Time (TODO)"`
+		TotalPower            int     `csv:"Total Power"`
+		TotalDistance         int     `csv:"Total Distance"`
+		EstimatedCaloriesLow  int     `csv:"Estimated Calories Low"`
+		EstimatedCaloriesHigh int     `csv:"Estimated Calories High"`
+	}
+	d := csvstruct.NewDecoder(eresp.Body)
+	classes := []class{}
+	var cls class
+	for err != io.EOF {
+		if err = d.DecodeNext(&cls); err != nil && err != io.EOF {
+			classes = append(classes, cls)
+		}
+	}
+	fmt.Fprintf(w, "%v", classes)
 }
