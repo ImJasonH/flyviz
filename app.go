@@ -23,14 +23,17 @@ func init() {
 
 var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
-// RoundTripper that adds a token before making the request.
-type tokenRT struct{ c appengine.Context }
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, r.Method+" not supported", http.StatusMethodNotAllowed)
+		return
+	}
+	c := appengine.NewContext(r)
 
-func (t tokenRT) RoundTrip(r *http.Request) (*http.Response, error) {
-	clientID := value.Get(t.c, "client_id")
-	secret := value.Get(t.c, "client_secret")
-	refresh := value.Get(t.c, "refresh_token")
-
+	// Set up the HTTP client using urlfetch and OAuth creds
+	clientID := value.Get(c, "client_id")
+	secret := value.Get(c, "client_secret")
+	refresh := value.Get(c, "refresh_token")
 	trans := oauth.Transport{
 		Config: &oauth.Config{
 			ClientId:     clientID,
@@ -38,25 +41,12 @@ func (t tokenRT) RoundTrip(r *http.Request) (*http.Response, error) {
 			TokenURL:     "https://accounts.google.com/o/oauth2/token",
 		},
 		Token:     &oauth.Token{RefreshToken: refresh},
-		Transport: &urlfetch.Transport{Context: t.c},
+		Transport: &urlfetch.Transport{Context: c},
 	}
-	return trans.RoundTrip(r)
-}
-
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, r.Method+" not supported", http.StatusMethodNotAllowed)
-		return
-	}
-
-	c := appengine.NewContext(r)
-	client := http.Client{
-		Transport: tokenRT{c},
-	}
-
-	f := r.FormValue("file")
+	client := trans.Client()
 
 	// Upload file and request conversion
+	f := r.FormValue("file")
 	iresp, err := client.Post("https://www.googleapis.com/upload/drive/v2/files?uploadType=media&convert=true", "application/vnd.ms-excel", strings.NewReader(f))
 	if err != nil {
 		c.Errorf("%v", err)
