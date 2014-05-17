@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"io"
 	"net/http"
@@ -13,7 +12,7 @@ import (
 	"appengine/urlfetch"
 
 	"code.google.com/p/goauth2/oauth"
-	value "gist.github.com/2dff7bd89dcacd3e70b9.git"
+	value "github.com/ImJasonH/appengine-value"
 	"github.com/ImJasonH/csvstruct"
 )
 
@@ -25,7 +24,7 @@ var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, r.Method+" not supported", http.StatusMethodNotAllowed)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	c := appengine.NewContext(r)
@@ -34,6 +33,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	clientID := value.Get(c, "client_id")
 	secret := value.Get(c, "client_secret")
 	refresh := value.Get(c, "refresh_token")
+
 	trans := oauth.Transport{
 		Config: &oauth.Config{
 			ClientId:     clientID,
@@ -43,13 +43,25 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		Token:     &oauth.Token{RefreshToken: refresh},
 		Transport: &urlfetch.Transport{Context: c},
 	}
+	// Explicitly exercise the refresh token to get an access token
+	if err := trans.Refresh(); err != nil {
+		c.Errorf("%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	client := trans.Client()
 
 	// Upload file and request conversion
-	f := r.FormValue("file")
-	iresp, err := client.Post("https://www.googleapis.com/upload/drive/v2/files?uploadType=media&convert=true", "application/vnd.ms-excel", strings.NewReader(f))
+	f, _, err := r.FormFile("file")
 	if err != nil {
 		c.Errorf("%v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+	iresp, err := client.Post("https://www.googleapis.com/upload/drive/v2/files?uploadType=media&convert=true", "application/vnd.ms-excel", f)
+	if err != nil {
+		c.Errorf("uploading for conversion: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +70,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		var buf bytes.Buffer
 		io.Copy(&buf, iresp.Body)
 		c.Errorf(buf.String())
-		c.Errorf("Error %d", iresp.StatusCode)
+		c.Errorf("uploading for conversion: error %d", iresp.StatusCode)
 		http.Error(w, buf.String(), http.StatusInternalServerError)
 		return
 	}
@@ -69,7 +81,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		ExportLinks map[string]string
 	}
 	if err := json.NewDecoder(iresp.Body).Decode(&insertResp); err != nil {
-		c.Errorf("%v", err)
+		c.Errorf("decoding json: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -84,7 +96,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch export link
 	eresp, err := client.Get(link)
 	if err != nil {
-		c.Errorf("%v", err)
+		c.Errorf("fetching csv: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -93,7 +105,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		var buf bytes.Buffer
 		io.Copy(&buf, eresp.Body)
 		c.Errorf(buf.String())
-		c.Errorf("Error %d", eresp.StatusCode)
+		c.Errorf("error fetching csv %d", eresp.StatusCode)
 		http.Error(w, buf.String(), http.StatusInternalServerError)
 		return
 	}
@@ -105,7 +117,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Decode CSV and print
 	type class struct {
-		Date                  int64
+		Date                  int64 `csv:"-"`
 		Time                  string
 		Classroom             string
 		Instructor            string
@@ -123,10 +135,17 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	d := csvstruct.NewDecoder(eresp.Body)
 	classes := []class{}
 	var cls class
-	for err != io.EOF {
-		if err = d.DecodeNext(&cls); err != nil && err != io.EOF {
-			classes = append(classes, cls)
+	for {
+		if err := d.DecodeNext(&cls); err == io.EOF {
+			break
+		} else if err != nil {
+			c.Errorf("%v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
+		classes = append(classes, cls)
 	}
-	fmt.Fprintf(w, "%v", classes)
+	if err := tmpl.Execute(w, classes); err != nil {
+		c.Warningf("%v", err)
+	}
 }
