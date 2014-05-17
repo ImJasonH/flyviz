@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"appengine"
 	"appengine/urlfetch"
@@ -33,21 +34,19 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	clientID := value.Get(c, "client_id")
 	secret := value.Get(c, "client_secret")
 	refresh := value.Get(c, "refresh_token")
-
 	trans := oauth.Transport{
 		Config: &oauth.Config{
 			ClientId:     clientID,
 			ClientSecret: secret,
 			TokenURL:     "https://accounts.google.com/o/oauth2/token",
 		},
-		Token:     &oauth.Token{RefreshToken: refresh},
+		Token: &oauth.Token{
+			RefreshToken: refresh,
+			// Explicitly state the token is expired so that it will be
+			// exercised for an access token
+			Expiry: time.Now().Add(-time.Minute),
+		},
 		Transport: &urlfetch.Transport{Context: c},
-	}
-	// Explicitly exercise the refresh token to get an access token
-	if err := trans.Refresh(); err != nil {
-		c.Errorf("%v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 	client := trans.Client()
 
@@ -134,8 +133,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	d := csvstruct.NewDecoder(eresp.Body)
 	classes := []class{}
-	var cls class
+	studioCounts := map[string]int{}
+	instructorCounts := map[string]int{}
+	totals := map[string]int{}
+	maxes := map[string]int{}
+	mins := map[string]int{}
 	for {
+		var cls class
 		if err := d.DecodeNext(&cls); err == io.EOF {
 			break
 		} else if err != nil {
@@ -144,8 +148,39 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		classes = append(classes, cls)
+
+		studioCounts[cls.Classroom]++
+		instructorCounts[cls.Instructor]++
+		totals["Classes"]++
+		totals["Power"] += cls.TotalPower
+		totals["Distance"] += cls.TotalDistance
+		totals["CalLow"] += cls.EstimatedCaloriesLow
+		totals["CalHigh"] += cls.EstimatedCaloriesHigh
+
+		if cls.TotalPower > maxes["Power"] {
+			maxes["Power"] = cls.TotalPower
+		}
+		if cls.TotalDistance > maxes["Distance"] {
+			maxes["Distance"] = cls.TotalDistance
+		}
+
+		if v, ok := mins["Power"]; !ok || cls.TotalPower < v {
+			mins["Power"] = cls.TotalPower
+		}
+		if v, ok := mins["Distance"]; !ok || cls.TotalDistance < v {
+			mins["Distance"] = cls.TotalDistance
+		}
 	}
-	if err := tmpl.Execute(w, classes); err != nil {
+
+	if err := tmpl.Execute(w, map[string]interface{}{
+		"Classes":          classes,
+		"StudioCounts":     studioCounts,
+		"InstructorCounts": instructorCounts,
+		"Total":            len(classes),
+		"Totals": totals,
+		"Maxes": maxes,
+		"Mins": mins,
+	}); err != nil {
 		c.Warningf("%v", err)
 	}
 }

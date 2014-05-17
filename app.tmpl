@@ -1,4 +1,42 @@
 <html><body>
+
+You have taken {{.Total}} classes
+
+<ul>
+{{range $ins, $cnt := .InstructorCounts}}
+  <li>{{$ins}} ({{$cnt}})</li>
+{{end}}
+</ul>
+<hr />
+
+<ul>
+{{range $std, $cnt := .StudioCounts}}
+  <li>{{$std}} ({{$cnt}})</li>
+{{end}}
+</ul>
+<hr />
+
+<ul>
+{{range $met, $val := .Totals}}
+  <li>Total {{$met}} = {{$val}}</li>
+{{end}}
+</ul>
+<hr />
+
+<ul>
+{{range $met, $val := .Maxes}}
+  <li>Max {{$met}} = {{$val}}</li>
+{{end}}
+</ul>
+<hr />
+
+<ul>
+{{range $met, $val := .Mins}}
+  <li>Min {{$met}} = {{$val}}</li>
+{{end}}
+</ul>
+<hr />
+
 <table>
 <thead>
 <tr>
@@ -18,7 +56,7 @@
 </tr>
 </thead>
 <tbody>
-{{range .}}
+{{range .Classes}}
 <tr>
   <td>{{.Date}}</td>
   <td>{{.Time}}</td>
