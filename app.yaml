@@ -9,5 +9,5 @@ handlers:
   static_files: home.html
   upload: home.html
 
-- url: /upload
+- url: /.*
   script: _go_app
