@@ -23,6 +23,12 @@ func init() {
 
 var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
+var (
+	clientID = value.String("client_id")
+	secret   = value.String("client_secret")
+	refresh  = value.String("refresh_token")
+)
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -31,17 +37,15 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
 	// Set up the HTTP client using urlfetch and OAuth creds
-	clientID := value.Get(c, "client_id")
-	secret := value.Get(c, "client_secret")
-	refresh := value.Get(c, "refresh_token")
+	value.Init(c)
 	trans := oauth.Transport{
 		Config: &oauth.Config{
-			ClientId:     clientID,
-			ClientSecret: secret,
+			ClientId:     *clientID,
+			ClientSecret: *secret,
 			TokenURL:     "https://accounts.google.com/o/oauth2/token",
 		},
 		Token: &oauth.Token{
-			RefreshToken: refresh,
+			RefreshToken: *refresh,
 			// Explicitly state the token is expired so that it will be
 			// exercised for an access token
 			Expiry: time.Now().Add(-time.Minute),
