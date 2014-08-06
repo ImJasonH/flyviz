@@ -1,11 +1,17 @@
 <html><body>
-<form action="/upload" method="post" id="form" enctype="multipart/form-data">
-  <label for="file">Upload your flywheel_stats.xls</label><br />
-  <input type="file" name="file" id="file" width="100%" height="100%"></input>
-  <script type="text/javascript">
-  document.getElementById('file').onchange = function() {
-    document.getElementById('form').submit();
-  };
-  </script>
-</form>
+<h2>Instructions</h2>
+<ol>
+  <li>Go to <a href="https://new-york.flywheelsports.com/user" target="_blank">https://new-york.flywheelsports.com/user</a> and log in</li>
+  <li>Click on the "Performance" tab</li>
+  <li>Click "Download Data (Excel)"</li>
+  <li><form action="/upload" method="post" id="form" enctype="multipart/form-data">
+    <label for="file">Upload your flywheel_stats.xls</label>:
+    <input type="file" name="file" id="file" width="100%" height="100%"></input>
+    <script type="text/javascript">
+    document.getElementById('file').onchange = function() {
+      document.getElementById('form').submit();
+    };
+    </script>
+  </form></li>
+</ol>
 </body></html>
