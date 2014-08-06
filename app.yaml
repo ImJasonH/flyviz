@@ -8,6 +8,8 @@ handlers:
 - url: /
   static_files: home.html
   upload: home.html
+  secure: always
 
 - url: /.*
   script: _go_app
+  secure: always
