@@ -23,12 +23,6 @@ func init() {
 
 var tmpl = template.Must(template.ParseFiles("app.tmpl"))
 
-var (
-	clientID = value.String("client_id")
-	secret   = value.String("client_secret")
-	refresh  = value.String("refresh_token")
-)
-
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -37,15 +31,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
 	// Set up the HTTP client using urlfetch and OAuth creds
-	value.Init(c)
 	trans := oauth.Transport{
 		Config: &oauth.Config{
-			ClientId:     *clientID,
-			ClientSecret: *secret,
+			ClientId:     value.Get(c, "client_id"),
+			ClientSecret: value.Get(c, "client_secret"),
 			TokenURL:     "https://accounts.google.com/o/oauth2/token",
 		},
 		Token: &oauth.Token{
-			RefreshToken: *refresh,
+			RefreshToken: value.Get(c, "refresh_token"),
 			// Explicitly state the token is expired so that it will be
 			// exercised for an access token
 			Expiry: time.Now().Add(-time.Minute),
@@ -181,9 +174,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		"StudioCounts":     studioCounts,
 		"InstructorCounts": instructorCounts,
 		"Total":            len(classes),
-		"Totals": totals,
-		"Maxes": maxes,
-		"Mins": mins,
+		"Totals":           totals,
+		"Maxes":            maxes,
+		"Mins":             mins,
 	}); err != nil {
 		c.Warningf("%v", err)
 	}
