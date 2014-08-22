@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"appengine"
 	"appengine/urlfetch"
@@ -30,21 +29,23 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	c := appengine.NewContext(r)
 
+	values := value.GetMulti(c, "client_id", "client_secret", "refresh_token")
+	clientID, clientSecret, refreshToken := values["client_id"], values["client_secret"], values["refresh_token"]
+
 	// Set up the HTTP client using urlfetch and OAuth creds
 	trans := oauth.Transport{
 		Config: &oauth.Config{
-			ClientId:     value.Get(c, "client_id"),
-			ClientSecret: value.Get(c, "client_secret"),
+			ClientId:     clientID,
+			ClientSecret: clientSecret,
 			TokenURL:     "https://accounts.google.com/o/oauth2/token",
 		},
 		Token: &oauth.Token{
-			RefreshToken: value.Get(c, "refresh_token"),
-			// Explicitly state the token is expired so that it will be
-			// exercised for an access token
-			Expiry: time.Now().Add(-time.Minute),
+			RefreshToken: refreshToken,
 		},
 		Transport: &urlfetch.Transport{Context: c},
 	}
+	// Explicitly refresh the token to get an access token
+	trans.Refresh()
 	client := trans.Client()
 
 	// Upload file and request conversion
@@ -113,7 +114,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Decode CSV and print
 	type class struct {
-		Date                  int64 `csv:"-"`
+		Date                  string
 		Time                  string
 		Classroom             string
 		Instructor            string
@@ -180,4 +181,21 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		c.Warningf("%v", err)
 	}
+}
+
+// Break in case of emergency:
+
+type loggingTransport struct {
+	rt http.RoundTripper
+	c  appengine.Context
+}
+
+func (lt loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	lt.c.Debugf("request: %v", req)
+	r, err := lt.rt.RoundTrip(req)
+	if err != nil {
+		lt.c.Errorf("error: %v", err)
+	}
+	lt.c.Debugf("response: %v", r)
+	return r, err
 }
